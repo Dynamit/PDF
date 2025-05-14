@@ -87,15 +87,28 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `שגיאה ${response.status} בעת העלאת הקבצים.`);
+        // Try to parse error response as JSON, otherwise use status text
+        let errorMsg = `שגיאה ${response.status} בעת העלאת הקבצים.`;
+        try {
+            const errorData = await response.json();
+            errorMsg = errorData.error || errorData.details || errorMsg;
+        } catch (jsonParseError) {
+            // If response is not JSON, use status text or a generic message
+            errorMsg = response.statusText || errorMsg;
+        }
+        throw new Error(errorMsg);
       }
 
       const result: DifferencesData = await response.json();
       setData(result);
-    } catch (err: unknown) { // Changed from any to unknown
-      const errorWithMessage = err as { message?: string }; // Type assertion
-      setError(errorWithMessage.message || "אירעה שגיאה לא צפויה.");
+    } catch (err: unknown) { // Correctly typed as unknown
+      if (err instanceof Error) {
+        setError(err.message);
+      } else if (typeof err === 'string') {
+        setError(err);
+      } else {
+        setError("אירעה שגיאה לא צפויה.");
+      }
       setData(null);
     } finally {
       setIsLoading(false);
@@ -128,10 +141,9 @@ export default function Home() {
   const generateFinalForm = () => {
     if (!data || !allSelected) return null;
     const finalSegments: { text: string, source: string }[] = [];
-    // const currentIMAIndex = 0; // Marked as unused by ESLint, commenting out
-    // const currentAssutaIndex = 0; // Marked as unused by ESLint, commenting out
+    // const currentIMAIndex = 0; // Removed as it was unused
+    // const currentAssutaIndex = 0; // Removed as it was unused
 
-    // This logic might need refinement based on how segments are structured by the python script
     data.diff_table.forEach(diff => {
         const choice = selections[diff.id];
         if (choice === 'ima') {
@@ -141,21 +153,13 @@ export default function Home() {
         }
     });
     
-    // Fallback or placeholder for common text - this needs more robust logic
-    // For a truly accurate final form, the Python script should provide a way to reconstruct the full document
-    // based on selections, including common parts. The current `diff_table` only contains differences.
-    // For now, the final form will only show the selected differing segments sequentially.
-    // This is a known limitation of the current `differences.json` structure if it only contains diffs.
-
     return (
       <div ref={finalFormRef} className="final-form p-8 bg-white shadow-lg rounded-lg max-w-4xl mx-auto my-10 text-right" dir="rtl">
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-3xl font-bold text-blue-700">טופס הסכמה סופי</h2>
-          {/* Ensure assuta_logo.gif is in the public folder */}
           <Image src="/assuta_logo.gif" alt="לוגו אסותא" width={150} height={50} unoptimized />
         </div>
         {finalSegments.map((segment, index) => (
-          // Adding space between segments for readability
           <span key={index} className={`source-${segment.source.toLowerCase()} mr-1`}>{segment.text}</span>
         ))}
         {finalSegments.length === 0 && <p>לא נבחרו הבדלים, או שמבנה הנתונים אינו מאפשר יצירת טופס מלא.</p>}
@@ -191,12 +195,11 @@ export default function Home() {
           <p className="text-lg text-gray-700 mt-2">העלה שני קבצי PDF, השווה ביניהם, בחר את הנוסח המועדף וצור טופס סופי.</p>
         </header>
 
-        {/* File Upload Section */}
         <form onSubmit={handleSubmit} className="mb-8 p-6 bg-white shadow-md rounded-lg">
           <h2 className="text-2xl font-semibold mb-4 text-gray-800">העלאת קבצים להשוואה</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
             <div>
-              <label htmlFor="file1" className="block text-sm font-medium text-gray-700 mb-1">קובץ PDF ראשון (למשל, הר&quot;י):</label>
+              <label htmlFor="file1" className="block text-sm font-medium text-gray-700 mb-1">קובץ PDF ראשון (למשל, הר&quot;י):</label> 
               <input type="file" id="file1" accept=".pdf" onChange={handleFile1Change} className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none p-2" />
             </div>
             <div>
@@ -217,12 +220,10 @@ export default function Home() {
           </div>
         )}
 
-        {/* Comparison Section - only show if data is loaded and no loading in progress */}
         {!isLoading && data && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Differences Table and Controls Panel */}
             <div className="md:col-span-1 bg-white p-6 rounded-lg shadow-xl h-full flex flex-col sticky top-6">
-              <h2 className="text-2xl font-semibold mb-1 text-blue-700 border-b-2 border-gray-300 pb-2">טבלת ההבדלים</h2> {/* Corrected title to Hebrew */}
+              <h2 className="text-2xl font-semibold mb-1 text-blue-700 border-b-2 border-gray-300 pb-2">טבלת ההבדלים</h2>
               <div className="my-3">
                 <div className="text-sm font-medium text-gray-700 mb-1">התקדמות: {numSelected} מתוך {totalDiffs} הבדלים נבחרו</div>
                 <div className="w-full bg-gray-200 rounded-full h-4 shadow-inner">
@@ -232,7 +233,7 @@ export default function Home() {
                   ></div>
                 </div>
               </div>
-              <p className="text-xs text-gray-600 mb-4">הקלק על קטע טקסט צבעוני במסמכים או בחר מהטבלה. הטקסט הנבחר יודגש בירוק. לאחר בחירת כל ההבדלים, כפתור &quot;יצירת טופס סופי&quot; יהפוך לפעיל.</p>
+              <p className="text-xs text-gray-600 mb-4">הקלק על קטע טקסט צבעוני במסמכים או בחר מהטבלה. הטקסט הנבחר יודגש בירוק. לאחר בחירת כל ההבדלים, כפתור {`"יצירת טופס סופי"`} יהפוך לפעיל.</p>
               
               <div className="overflow-y-auto flex-grow max-h-[calc(100vh-320px)] pr-2 border rounded-md bg-gray-50 p-1">
                 {data.diff_table.length === 0 && <p className="text-gray-500 text-center py-4">לא נמצאו הבדלים או שהקבצים זהים.</p>}
@@ -288,7 +289,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Document Comparison Panels */}
             <div className="md:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white p-6 rounded-lg shadow-xl">
                 <h3 className="text-xl font-semibold mb-4 text-red-700 border-b-2 border-red-200 pb-2">קובץ 1 (למשל, הר&quot;י)</h3>

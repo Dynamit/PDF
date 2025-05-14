@@ -1,4 +1,4 @@
-// src/app/api/compare-pdfs/route.ts
+ // src/app/api/compare-pdfs/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
@@ -12,15 +12,15 @@ const UPLOAD_DIR = "/tmp"; // Use a temporary directory
 // Adjust the path if your project structure is different during deployment
 const PYTHON_SCRIPT_PATH = path.resolve(process.cwd(), "scripts/compare_texts.py");
 
-interface ExecError extends Error {
+interface ExecError extends Error { // This interface is used for type assertions, ensure it's accurate
   stderr?: string;
   stdout?: string;
   code?: number;
 }
 
 export async function POST(request: NextRequest) {
-  const tempFilePaths: string[] = []; // For uploaded PDFs
-  const tempTextFilePaths: string[] = []; // For extracted .txt files
+  const tempFilePaths: string[] = []; // For uploaded PDFs - Changed to const
+  const tempTextFilePaths: string[] = []; // For extracted .txt files - Changed to const
   let tempJsonOutputPath: string | null = null; // For comparison_output.json
 
   try {
@@ -60,28 +60,43 @@ export async function POST(request: NextRequest) {
       try {
         await execFileAsync("pdftotext", ["-enc", "UTF-8", tempFilePath, tempTextFilePath]);
       } catch (err: unknown) {
-        const execErr = err as ExecError;
-        console.error(`Error extracting text from ${file.name}:`, execErr);
+        console.error(`Error extracting text from ${file.name}:`, err); 
         let errorMessage = `שגיאה בחילוץ טקסט מהקובץ ${file.name}.`;
-        if (execErr.stderr) errorMessage += ` פרטי השגיאה: ${execErr.stderr}`;
-        if (execErr.code === 127) errorMessage = `שגיאה בחילוץ טקסט: פקודת pdftotext לא נמצאה. ודא שהיא מותקנת וזמינה ב-PATH של השרת.`;
+        let specificStdErr: string | undefined;
+        let specificCode: number | undefined;
+
+        if (typeof err === 'object' && err !== null) {
+            if ('stderr' in err && typeof (err as {stderr: unknown}).stderr === 'string') {
+                specificStdErr = (err as {stderr: string}).stderr;
+            }
+            if ('code' in err && typeof (err as {code: unknown}).code === 'number') {
+                specificCode = (err as {code: number}).code;
+            }
+        } else if (err instanceof Error) {
+            // errorMessage += ` (${err.message})`; // Optionally append generic message
+        }
+
+        if (specificStdErr) {
+            errorMessage += ` פרטי השגיאה: ${specificStdErr}`;
+        }
+        if (specificCode === 127) {
+            errorMessage = `שגיאה בחילוץ טקסט: פקודת pdftotext לא נמצאה. ודא שהיא מותקנת וזמינה ב-PATH של השרת.`;
+        }
         return NextResponse.json({ error: errorMessage }, { status: 500 });
       }
     }
 
-    // Now call the Python script for comparison
     tempJsonOutputPath = path.join(UPLOAD_DIR, `comparison_output_${Date.now()}.json`);
     
-    // Check if python3.11 is available, otherwise try python3 or python
     let pythonExecutable = "python3.11";
     try {
         await execFileAsync(pythonExecutable, ["--version"]);
-    } catch (_e: unknown) { // Changed e to _e as it's not used
+    } catch (_e: unknown) { 
         pythonExecutable = "python3";
         try {
             await execFileAsync(pythonExecutable, ["--version"]);
-        } catch (_e2: unknown) { // Changed e2 to _e2 as it's not used
-            pythonExecutable = "python"; // Fallback to just python
+        } catch (_e2: unknown) { 
+            pythonExecutable = "python"; 
         }
     }
 
@@ -93,12 +108,29 @@ export async function POST(request: NextRequest) {
         tempJsonOutputPath,
       ]);
     } catch (err: unknown) {
-      const execErr = err as ExecError;
-      console.error("Error running Python comparison script:", execErr);
+      console.error("Error running Python comparison script:", err);
       let errorMessage = "שגיאה בביצוע השוואת הטקסטים.";
-      if (execErr.stderr) errorMessage += ` פרטי השגיאה: ${execErr.stderr}`;
-      if (execErr.stdout) errorMessage += ` פלט: ${execErr.stdout}`;
-      if (execErr.code === 127) errorMessage = `שגיאה בהשוואה: פקודת ${pythonExecutable} לא נמצאה או שסקריפט הפייתון לא נמצא בנתיב ${PYTHON_SCRIPT_PATH}.`;
+      let specificStdErr: string | undefined;
+      let specificStdOut: string | undefined;
+      let specificCode: number | undefined;
+
+      if (typeof err === 'object' && err !== null) {
+          if ('stderr' in err && typeof (err as {stderr: unknown}).stderr === 'string') {
+              specificStdErr = (err as {stderr: string}).stderr;
+          }
+          if ('stdout' in err && typeof (err as {stdout: unknown}).stdout === 'string') {
+              specificStdOut = (err as {stdout: string}).stdout;
+          }
+          if ('code' in err && typeof (err as {code: unknown}).code === 'number') {
+              specificCode = (err as {code: number}).code;
+          }
+      } else if (err instanceof Error) {
+          // Optionally append generic message
+      }
+
+      if (specificStdErr) errorMessage += ` פרטי השגיאה: ${specificStdErr}`;
+      if (specificStdOut) errorMessage += ` פלט: ${specificStdOut}`;
+      if (specificCode === 127) errorMessage = `שגיאה בהשוואה: פקודת ${pythonExecutable} לא נמצאה או שסקריפט הפייתון לא נמצא בנתיב ${PYTHON_SCRIPT_PATH}.`;
       return NextResponse.json({ error: errorMessage, scriptPath: PYTHON_SCRIPT_PATH, textFiles: tempTextFilePaths }, { status: 500 });
     }
 
@@ -108,11 +140,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(comparisonResult, { status: 200 });
 
   } catch (error: unknown) {
-    const err = error as Error;
-    console.error("שגיאה כללית בעיבוד הבקשה:", err);
-    return NextResponse.json({ error: "שגיאה פנימית בשרת בעת עיבוד הקבצים.", details: err.message }, { status: 500 });
+    console.error("שגיאה כללית בעיבוד הבקשה:", error);
+    let detailsMessage = "שגיאה לא ידועה";
+    if (error instanceof Error) {
+        detailsMessage = error.message;
+    } else if (typeof error === 'object' && error !== null && 'message' in error && typeof (error as {message: unknown}).message === 'string') {
+        detailsMessage = (error as {message: string}).message;
+    } else if (typeof error === 'string') {
+        detailsMessage = error;
+    }
+    return NextResponse.json({ error: "שגיאה פנימית בשרת בעת עיבוד הקבצים.", details: detailsMessage }, { status: 500 });
   } finally {
-    // Clean up temporary files
     const filesToClean = [...tempFilePaths, ...tempTextFilePaths];
     if (tempJsonOutputPath) {
       filesToClean.push(tempJsonOutputPath);

@@ -4,6 +4,7 @@ import fs from "fs/promises";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
+import pdf from "pdf-parse"; // Import pdf-parse
 
 const execFileAsync = promisify(execFile);
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
@@ -11,7 +12,7 @@ const UPLOAD_DIR = "/tmp"; // Use a temporary directory
 const PYTHON_SCRIPT_PATH = path.resolve(process.cwd(), "scripts/compare_texts.py");
 
 export async function POST(request: NextRequest) {
-  const tempFilePaths: string[] = [];
+  // Removed tempFilePaths as we will process buffers directly for pdf-parse
   const tempTextFilePaths: string[] = [];
   let tempJsonOutputPath: string | null = null;
 
@@ -37,43 +38,27 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: `הקובץ ${file.name} אינו קובץ PDF.` }, { status: 400 });
       }
 
-      const tempFileName = `upload_${Date.now()}_${i}_${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
-      const tempFilePath = path.join(UPLOAD_DIR, tempFileName);
-      tempFilePaths.push(tempFilePath);
-
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
-      await fs.writeFile(tempFilePath, buffer);
 
-      const tempTextFileName = `extracted_${Date.now()}_${i}.txt`;
-      const tempTextFilePath = path.join(UPLOAD_DIR, tempTextFileName);
-      tempTextFilePaths.push(tempTextFilePath);
-
+      // Use pdf-parse to extract text
+      let extractedText;
       try {
-        await execFileAsync("pdftotext", ["-enc", "UTF-8", tempFilePath, tempTextFilePath]);
-      } catch (err: unknown) {
-        console.error(`Error extracting text from ${file.name}:`, err); 
-        let errorMessage = `שגיאה בחילוץ טקסט מהקובץ ${file.name}.`;
-        let specificStdErr: string | undefined;
-        let specificCode: number | undefined;
-
-        if (typeof err === "object" && err !== null) {
-            if ("stderr" in err && typeof (err as {stderr: unknown}).stderr === "string") {
-                specificStdErr = (err as {stderr: string}).stderr;
-            }
-            if ("code" in err && typeof (err as {code: unknown}).code === "number") {
-                specificCode = (err as {code: number}).code;
-            }
-        } 
-
-        if (specificStdErr) {
-            errorMessage += ` פרטי השגיאה: ${specificStdErr}`;
-        }
-        if (specificCode === 127) {
-            errorMessage = `שגיאה בחילוץ טקסט: פקודת pdftotext לא נמצאה. ודא שהיא מותקנת וזמינה ב-PATH של השרת.`;
+        const data = await pdf(buffer);
+        extractedText = data.text;
+      } catch (parseError: unknown) {
+        console.error(`Error parsing PDF ${file.name} with pdf-parse:`, parseError);
+        let errorMessage = `שגיאה בפענוח הקובץ ${file.name} באמצעות ספריית pdf-parse.`;
+        if (parseError instanceof Error) {
+            errorMessage += ` פרטי השגיאה: ${parseError.message}`;
         }
         return NextResponse.json({ error: errorMessage }, { status: 500 });
       }
+
+      const tempTextFileName = `extracted_${Date.now()}_${i}.txt`;
+      const tempTextFilePath = path.join(UPLOAD_DIR, tempTextFileName);
+      await fs.writeFile(tempTextFilePath, extractedText); // Save extracted text to file
+      tempTextFilePaths.push(tempTextFilePath);
     }
 
     tempJsonOutputPath = path.join(UPLOAD_DIR, `comparison_output_${Date.now()}.json`);
@@ -141,7 +126,8 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ error: "שגיאה פנימית בשרת בעת עיבוד הקבצים.", details: detailsMessage }, { status: 500 });
   } finally {
-    const filesToClean = [...tempFilePaths, ...tempTextFilePaths];
+    // No need to clean tempFilePaths as they are not created anymore
+    const filesToClean = [...tempTextFilePaths]; 
     if (tempJsonOutputPath) {
       filesToClean.push(tempJsonOutputPath);
     }

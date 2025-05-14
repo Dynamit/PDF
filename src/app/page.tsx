@@ -1,12 +1,12 @@
 "use client";
-import Head from 'next/head';
-import Image from 'next/image';
-import { useEffect, useState, useRef, ChangeEvent, FormEvent } from 'react';
+import Head from "next/head";
+import Image from "next/image";
+import { useEffect, useState, useRef, ChangeEvent, FormEvent } from "react";
 
 // Define interfaces for our data structures
 interface DiffSegment {
   text: string;
-  type: 'common' | 'changed';
+  type: "common" | "changed";
   diff_id?: number;
 }
 
@@ -23,7 +23,7 @@ interface DifferencesData {
 }
 
 interface Selections {
-  [key: number]: 'ima' | 'assuta';
+  [key: number]: "ima" | "assuta";
 }
 
 export default function Home() {
@@ -91,7 +91,8 @@ export default function Home() {
         try {
             const errorData = await response.json();
             errorMsg = errorData.error || errorData.details || errorMsg;
-        } catch (_jsonParseError: unknown) { // _jsonParseError is intentionally unused here
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (_jsonParseError: unknown) { 
             errorMsg = response.statusText || errorMsg;
         }
         throw new Error(errorMsg);
@@ -102,7 +103,7 @@ export default function Home() {
     } catch (err: unknown) { 
       if (err instanceof Error) {
         setError(err.message);
-      } else if (typeof err === 'string') {
+      } else if (typeof err === "string") {
         setError(err);
       } else {
         setError("אירעה שגיאה לא צפויה.");
@@ -113,24 +114,24 @@ export default function Home() {
     }
   };
 
-  const handleSelection = (diffId: number, choice: 'ima' | 'assuta') => {
+  const handleSelection = (diffId: number, choice: "ima" | "assuta") => {
     setSelections(prev => ({ ...prev, [diffId]: choice }));
   };
 
-  const getSegmentStyle = (segment: DiffSegment, docType: 'ima' | 'assuta') => {
+  const getSegmentStyle = (segment: DiffSegment, docType: "ima" | "assuta") => {
     const baseStyle = "inline cursor-pointer hover:opacity-75 transition-opacity";
-    if (segment.type === 'changed' && segment.diff_id) {
+    if (segment.type === "changed" && segment.diff_id) {
       const selection = selections[segment.diff_id];
       if (selection === docType) {
         return `${baseStyle} bg-green-300 p-1 rounded`;
       }
-      return `${baseStyle} ${docType === 'ima' ? 'bg-red-300' : 'bg-blue-300'} p-1 rounded`; 
+      return `${baseStyle} ${docType === "ima" ? "bg-red-300" : "bg-blue-300"} p-1 rounded`; 
     }
     return "inline";
   };
 
-  const handleSegmentClick = (segment: DiffSegment, docType: 'ima' | 'assuta') => {
-    if (segment.type === 'changed' && segment.diff_id) {
+  const handleSegmentClick = (segment: DiffSegment, docType: "ima" | "assuta") => {
+    if (segment.type === "changed" && segment.diff_id) {
       handleSelection(segment.diff_id, docType);
     }
   };
@@ -141,10 +142,10 @@ export default function Home() {
 
     data.diff_table.forEach(diff => {
         const choice = selections[diff.id];
-        if (choice === 'ima') {
-            finalSegments.push({ text: diff.ima_text, source: 'IMA' });
-        } else if (choice === 'assuta') {
-            finalSegments.push({ text: diff.assuta_text, source: 'Assuta' });
+        if (choice === "ima") {
+            finalSegments.push({ text: diff.ima_text, source: "IMA" });
+        } else if (choice === "assuta") {
+            finalSegments.push({ text: diff.assuta_text, source: "Assuta" });
         }
     });
     
@@ -242,7 +243,7 @@ export default function Home() {
                   </thead>
                   <tbody>
                     {data.diff_table.map((diff) => (
-                      <tr key={diff.id} className={`${selections[diff.id] ? 'bg-green-100' : ''} hover:bg-gray-100 transition-colors duration-150`}>
+                      <tr key={diff.id} className={`${selections[diff.id] ? "bg-green-100" : ""} hover:bg-gray-100 transition-colors duration-150`}>
                         <td className="border-b border-gray-200 px-3 py-3 align-top font-medium">{diff.id}</td>
                         <td className="border-b border-gray-200 px-3 py-3 align-top">
                           <label className="flex items-start cursor-pointer p-1 rounded hover:bg-red-100 transition-colors">
@@ -250,8 +251,8 @@ export default function Home() {
                               type="radio" 
                               name={`diff-${diff.id}`} 
                               value="ima" 
-                              checked={selections[diff.id] === 'ima'}
-                              onChange={() => handleSelection(diff.id, 'ima')}
+                              checked={selections[diff.id] === "ima"}
+                              onChange={() => handleSelection(diff.id, "ima")}
                               className="mr-2 mt-1 accent-red-500 focus:ring-red-400"
                             />
                             <span className="text-gray-800 text-xs leading-relaxed">{diff.ima_text}</span>
@@ -263,8 +264,8 @@ export default function Home() {
                               type="radio" 
                               name={`diff-${diff.id}`} 
                               value="assuta" 
-                              checked={selections[diff.id] === 'assuta'}
-                              onChange={() => handleSelection(diff.id, 'assuta')}
+                              checked={selections[diff.id] === "assuta"}
+                              onChange={() => handleSelection(diff.id, "assuta")}
                               className="mr-2 mt-1 accent-blue-500 focus:ring-blue-400"
                             />
                             <span className="text-gray-800 text-xs leading-relaxed">{diff.assuta_text}</span>
@@ -289,9 +290,9 @@ export default function Home() {
                 <h3 className="text-xl font-semibold mb-4 text-red-700 border-b-2 border-red-200 pb-2">קובץ 1 (למשל, הר&quot;י)</h3>
                 <div className="text-right leading-relaxed whitespace-pre-wrap text-sm font-mono bg-red-50 p-3 rounded-md h-96 overflow-y-auto border border-red-200">
                   {data.doc1_segments.map((seg, index) => (
-                    <span key={`doc1-${index}`} className={getSegmentStyle(seg, 'ima')} onClick={() => handleSegmentClick(seg, 'ima')}>
+                    <span key={`doc1-${index}`} className={getSegmentStyle(seg, "ima")} onClick={() => handleSegmentClick(seg, "ima")}>
                       {seg.text}
-                      {seg.type === 'changed' && <sup className="text-xs font-bold text-red-700">({seg.diff_id})</sup>}
+                      {seg.type === "changed" && <sup className="text-xs font-bold text-red-700">({seg.diff_id})</sup>}
                     </span>
                   ))}
                 </div>
@@ -300,9 +301,9 @@ export default function Home() {
                 <h3 className="text-xl font-semibold mb-4 text-blue-700 border-b-2 border-blue-200 pb-2">קובץ 2 (למשל, אסותא)</h3>
                 <div className="text-right leading-relaxed whitespace-pre-wrap text-sm font-mono bg-blue-50 p-3 rounded-md h-96 overflow-y-auto border border-blue-200">
                   {data.doc2_segments.map((seg, index) => (
-                    <span key={`doc2-${index}`} className={getSegmentStyle(seg, 'assuta')} onClick={() => handleSegmentClick(seg, 'assuta')}>
+                    <span key={`doc2-${index}`} className={getSegmentStyle(seg, "assuta")} onClick={() => handleSegmentClick(seg, "assuta")}>
                       {seg.text}
-                      {seg.type === 'changed' && <sup className="text-xs font-bold text-blue-700">({seg.diff_id})</sup>}
+                      {seg.type === "changed" && <sup className="text-xs font-bold text-blue-700">({seg.diff_id})</sup>}
                     </span>
                   ))}
                 </div>
@@ -320,5 +321,4 @@ export default function Home() {
     </>
   );
 }
-
 

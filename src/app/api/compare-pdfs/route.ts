@@ -10,8 +10,6 @@ const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
 const UPLOAD_DIR = "/tmp"; // Use a temporary directory
 const PYTHON_SCRIPT_PATH = path.resolve(process.cwd(), "scripts/compare_texts.py");
 
-// Removed unused ExecError interface
-
 export async function POST(request: NextRequest) {
   const tempFilePaths: string[] = [];
   const tempTextFilePaths: string[] = [];
@@ -59,11 +57,11 @@ export async function POST(request: NextRequest) {
         let specificStdErr: string | undefined;
         let specificCode: number | undefined;
 
-        if (typeof err === 'object' && err !== null) {
-            if ('stderr' in err && typeof (err as {stderr: unknown}).stderr === 'string') {
+        if (typeof err === "object" && err !== null) {
+            if ("stderr" in err && typeof (err as {stderr: unknown}).stderr === "string") {
                 specificStdErr = (err as {stderr: string}).stderr;
             }
-            if ('code' in err && typeof (err as {code: unknown}).code === 'number') {
+            if ("code" in err && typeof (err as {code: unknown}).code === "number") {
                 specificCode = (err as {code: number}).code;
             }
         } 
@@ -83,11 +81,13 @@ export async function POST(request: NextRequest) {
     let pythonExecutable = "python3.11";
     try {
         await execFileAsync(pythonExecutable, ["--version"]);
-    } catch (_e: unknown) { // _e is intentionally unused here, only to catch the error
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_e: unknown) { 
         pythonExecutable = "python3";
         try {
             await execFileAsync(pythonExecutable, ["--version"]);
-        } catch (_e2: unknown) { // _e2 is intentionally unused here
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (_e2: unknown) { 
             pythonExecutable = "python"; 
         }
     }
@@ -106,14 +106,14 @@ export async function POST(request: NextRequest) {
       let specificStdOut: string | undefined;
       let specificCode: number | undefined;
 
-      if (typeof err === 'object' && err !== null) {
-          if ('stderr' in err && typeof (err as {stderr: unknown}).stderr === 'string') {
+      if (typeof err === "object" && err !== null) {
+          if ("stderr" in err && typeof (err as {stderr: unknown}).stderr === "string") {
               specificStdErr = (err as {stderr: string}).stderr;
           }
-          if ('stdout' in err && typeof (err as {stdout: unknown}).stdout === 'string') {
+          if ("stdout" in err && typeof (err as {stdout: unknown}).stdout === "string") {
               specificStdOut = (err as {stdout: string}).stdout;
           }
-          if ('code' in err && typeof (err as {code: unknown}).code === 'number') {
+          if ("code" in err && typeof (err as {code: unknown}).code === "number") {
               specificCode = (err as {code: number}).code;
           }
       } 
@@ -134,9 +134,9 @@ export async function POST(request: NextRequest) {
     let detailsMessage = "שגיאה לא ידועה";
     if (error instanceof Error) {
         detailsMessage = error.message;
-    } else if (typeof error === 'object' && error !== null && 'message' in error && typeof (error as {message: unknown}).message === 'string') {
+    } else if (typeof error === "object" && error !== null && "message" in error && typeof (error as {message: unknown}).message === "string") {
         detailsMessage = (error as {message: string}).message;
-    } else if (typeof error === 'string') {
+    } else if (typeof error === "string") {
         detailsMessage = error;
     }
     return NextResponse.json({ error: "שגיאה פנימית בשרת בעת עיבוד הקבצים.", details: detailsMessage }, { status: 500 });
@@ -154,5 +154,4 @@ export async function POST(request: NextRequest) {
     }
   }
 }
-
 

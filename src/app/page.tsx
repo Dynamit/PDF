@@ -93,8 +93,9 @@ export default function Home() {
 
       const result: DifferencesData = await response.json();
       setData(result);
-    } catch (err: any) {
-      setError(err.message || "אירעה שגיאה לא צפויה.");
+    } catch (err: unknown) { // Changed from any to unknown
+      const errorWithMessage = err as { message?: string }; // Type assertion
+      setError(errorWithMessage.message || "אירעה שגיאה לא צפויה.");
       setData(null);
     } finally {
       setIsLoading(false);
@@ -127,8 +128,8 @@ export default function Home() {
   const generateFinalForm = () => {
     if (!data || !allSelected) return null;
     const finalSegments: { text: string, source: string }[] = [];
-    let currentIMAIndex = 0;
-    let currentAssutaIndex = 0;
+    // const currentIMAIndex = 0; // Marked as unused by ESLint, commenting out
+    // const currentAssutaIndex = 0; // Marked as unused by ESLint, commenting out
 
     // This logic might need refinement based on how segments are structured by the python script
     data.diff_table.forEach(diff => {
@@ -195,7 +196,7 @@ export default function Home() {
           <h2 className="text-2xl font-semibold mb-4 text-gray-800">העלאת קבצים להשוואה</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
             <div>
-              <label htmlFor="file1" className="block text-sm font-medium text-gray-700 mb-1">קובץ PDF ראשון (למשל, הר"י):</label>
+              <label htmlFor="file1" className="block text-sm font-medium text-gray-700 mb-1">קובץ PDF ראשון (למשל, הר&quot;י):</label>
               <input type="file" id="file1" accept=".pdf" onChange={handleFile1Change} className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none p-2" />
             </div>
             <div>
@@ -290,7 +291,7 @@ export default function Home() {
             {/* Document Comparison Panels */}
             <div className="md:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white p-6 rounded-lg shadow-xl">
-                <h3 className="text-xl font-semibold mb-4 text-red-700 border-b-2 border-red-200 pb-2">קובץ 1 (למשל, הר"י)</h3>
+                <h3 className="text-xl font-semibold mb-4 text-red-700 border-b-2 border-red-200 pb-2">קובץ 1 (למשל, הר&quot;י)</h3>
                 <div className="text-right leading-relaxed whitespace-pre-wrap text-sm font-mono bg-red-50 p-3 rounded-md h-96 overflow-y-auto border border-red-200">
                   {data.doc1_segments.map((seg, index) => (
                     <span key={`doc1-${index}`} className={getSegmentStyle(seg, 'ima')} onClick={() => handleSegmentClick(seg, 'ima')}>

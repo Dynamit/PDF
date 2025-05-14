@@ -12,9 +12,15 @@ const UPLOAD_DIR = "/tmp"; // Use a temporary directory
 // Adjust the path if your project structure is different during deployment
 const PYTHON_SCRIPT_PATH = path.resolve(process.cwd(), "scripts/compare_texts.py");
 
+interface ExecError extends Error {
+  stderr?: string;
+  stdout?: string;
+  code?: number;
+}
+
 export async function POST(request: NextRequest) {
-  let tempFilePaths: string[] = []; // For uploaded PDFs
-  let tempTextFilePaths: string[] = []; // For extracted .txt files
+  const tempFilePaths: string[] = []; // For uploaded PDFs
+  const tempTextFilePaths: string[] = []; // For extracted .txt files
   let tempJsonOutputPath: string | null = null; // For comparison_output.json
 
   try {
@@ -53,11 +59,12 @@ export async function POST(request: NextRequest) {
 
       try {
         await execFileAsync("pdftotext", ["-enc", "UTF-8", tempFilePath, tempTextFilePath]);
-      } catch (err: any) {
-        console.error(`Error extracting text from ${file.name}:`, err);
+      } catch (err: unknown) {
+        const execErr = err as ExecError;
+        console.error(`Error extracting text from ${file.name}:`, execErr);
         let errorMessage = `שגיאה בחילוץ טקסט מהקובץ ${file.name}.`;
-        if (err.stderr) errorMessage += ` פרטי השגיאה: ${err.stderr}`;
-        if (err.code === 127) errorMessage = `שגיאה בחילוץ טקסט: פקודת pdftotext לא נמצאה. ודא שהיא מותקנת וזמינה ב-PATH של השרת.`;
+        if (execErr.stderr) errorMessage += ` פרטי השגיאה: ${execErr.stderr}`;
+        if (execErr.code === 127) errorMessage = `שגיאה בחילוץ טקסט: פקודת pdftotext לא נמצאה. ודא שהיא מותקנת וזמינה ב-PATH של השרת.`;
         return NextResponse.json({ error: errorMessage }, { status: 500 });
       }
     }
@@ -69,11 +76,11 @@ export async function POST(request: NextRequest) {
     let pythonExecutable = "python3.11";
     try {
         await execFileAsync(pythonExecutable, ["--version"]);
-    } catch (e) {
+    } catch (_e: unknown) { // Changed e to _e as it's not used
         pythonExecutable = "python3";
         try {
             await execFileAsync(pythonExecutable, ["--version"]);
-        } catch (e2) {
+        } catch (_e2: unknown) { // Changed e2 to _e2 as it's not used
             pythonExecutable = "python"; // Fallback to just python
         }
     }
@@ -85,12 +92,13 @@ export async function POST(request: NextRequest) {
         tempTextFilePaths[1],
         tempJsonOutputPath,
       ]);
-    } catch (err: any) {
-      console.error("Error running Python comparison script:", err);
+    } catch (err: unknown) {
+      const execErr = err as ExecError;
+      console.error("Error running Python comparison script:", execErr);
       let errorMessage = "שגיאה בביצוע השוואת הטקסטים.";
-      if (err.stderr) errorMessage += ` פרטי השגיאה: ${err.stderr}`;
-      if (err.stdout) errorMessage += ` פלט: ${err.stdout}`;
-      if (err.code === 127) errorMessage = `שגיאה בהשוואה: פקודת ${pythonExecutable} לא נמצאה או שסקריפט הפייתון לא נמצא בנתיב ${PYTHON_SCRIPT_PATH}.`;
+      if (execErr.stderr) errorMessage += ` פרטי השגיאה: ${execErr.stderr}`;
+      if (execErr.stdout) errorMessage += ` פלט: ${execErr.stdout}`;
+      if (execErr.code === 127) errorMessage = `שגיאה בהשוואה: פקודת ${pythonExecutable} לא נמצאה או שסקריפט הפייתון לא נמצא בנתיב ${PYTHON_SCRIPT_PATH}.`;
       return NextResponse.json({ error: errorMessage, scriptPath: PYTHON_SCRIPT_PATH, textFiles: tempTextFilePaths }, { status: 500 });
     }
 
@@ -99,9 +107,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(comparisonResult, { status: 200 });
 
-  } catch (error: any) {
-    console.error("שגיאה כללית בעיבוד הבקשה:", error);
-    return NextResponse.json({ error: "שגיאה פנימית בשרת בעת עיבוד הקבצים.", details: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error("שגיאה כללית בעיבוד הבקשה:", err);
+    return NextResponse.json({ error: "שגיאה פנימית בשרת בעת עיבוד הקבצים.", details: err.message }, { status: 500 });
   } finally {
     // Clean up temporary files
     const filesToClean = [...tempFilePaths, ...tempTextFilePaths];

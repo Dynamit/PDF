@@ -4,14 +4,10 @@ import fs from "fs/promises";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-// Use the legacy build for Node.js environments as recommended
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
+// Use the standard import for pdfjs-dist
+import * as pdfjsLib from "pdfjs-dist";
 
-// For server-side execution, especially with the legacy build, 
-// we might not need to set workerSrc, or set it to null/disable it.
-// The legacy build is often more self-contained for Node.js.
-// If issues persist, this might need to be pdfjsLib.GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
-// But let's try without it first, as the error was about HTTP protocol for worker.
+// Disable the worker for server-side Node.js environments like Vercel
 pdfjsLib.GlobalWorkerOptions.isWorkerDisabled = true;
 
 const execFileAsync = promisify(execFile);
@@ -23,9 +19,6 @@ async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   const uint8Array = new Uint8Array(buffer); // Convert Buffer to Uint8Array
   const pdfDoc = await pdfjsLib.getDocument({ 
     data: uint8Array,
-    // Disable worker for server-side processing if it causes issues
-    // useWorkerFetch: false, // This option might be relevant for older versions or specific setups
-    // worker: null, // Another way to potentially disable worker
   }).promise; 
   let fullText = "";
   for (let i = 1; i <= pdfDoc.numPages; i++) {

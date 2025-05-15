@@ -6,14 +6,13 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "postinstall": "patch-package"
+    "lint": "next lint"
   },
   "dependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "next": "15.3.2",
-    "pdf-parse": "^1.1.1"
+    "pdfjs-dist": "^4.4.170"
   },
   "devDependencies": {
     "typescript": "^5",
@@ -24,9 +23,6 @@
     "tailwindcss": "^4",
     "eslint": "^9",
     "eslint-config-next": "15.3.2",
-    "@eslint/eslintrc": "^3",
-    "@types/pdf-parse": "^1.1.0",
-    "patch-package": "^8.0.0",
-    "postinstall-postinstall": "^2.1.0"
+    "@eslint/eslintrc": "^3"
   }
 }

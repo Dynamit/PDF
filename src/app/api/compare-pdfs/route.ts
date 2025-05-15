@@ -4,37 +4,44 @@ import fs from "fs/promises";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-// Use the standard import for pdfjs-dist
-import * as pdfjsLib from "pdfjs-dist";
-
-// Set workerSrc to null to disable worker loading globally
-// @ts-expect-error - The types might not perfectly align, but null is a valid way to disable worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = null;
 
 const execFileAsync = promisify(execFile);
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
-const UPLOAD_DIR = "/tmp"; 
+const UPLOAD_DIR = "/tmp";
 const PYTHON_SCRIPT_PATH = path.resolve(process.cwd(), "scripts/compare_texts.py");
 
-async function extractTextFromPdf(buffer: Buffer): Promise<string> {
-  const uint8Array = new Uint8Array(buffer); // Convert Buffer to Uint8Array
-  const pdfDoc = await pdfjsLib.getDocument({ 
-    data: uint8Array,
-    // Removed disableWorker: true, relying on global workerSrc = null
-  }).promise; 
-  let fullText = "";
-  for (let i = 1; i <= pdfDoc.numPages; i++) {
-    const page = await pdfDoc.getPage(i);
-    const textContent = await page.getTextContent();
-    const pageText = textContent.items.map(item => {
-      if (typeof item === "object" && item !== null && "str" in item && typeof item.str === "string") {
-        return item.str;
-      }
-      return ""; 
-    }).filter(str => str !== "").join(" "); 
-    fullText += pageText + "\n"; 
+async function extractTextFromPdf(pdfBuffer: Buffer, originalFileName: string): Promise<string> {
+  const tempPdfFileName = `temp_${Date.now()}_${originalFileName}`;
+  const tempPdfFilePath = path.join(UPLOAD_DIR, tempPdfFileName);
+
+  try {
+    await fs.writeFile(tempPdfFilePath, pdfBuffer);
+    // Execute pdftotext: pdftotext <pdf_file_path> -
+    // The trailing hyphen means output to stdout
+    const { stdout, stderr } = await execFileAsync("pdftotext", [tempPdfFilePath, "-"]);
+    if (stderr) {
+      console.warn(`pdftotext stderr for ${originalFileName}: ${stderr}`);
+    }
+    return stdout;
+  } catch (error: unknown) {
+    console.error(`Error extracting text with pdftotext for ${originalFileName}:`, error);
+    let errorMessage = `שגיאה בחילוץ טקסט מהקובץ ${originalFileName} באמצעות pdftotext.`;
+    if (typeof error === "object" && error !== null) {
+        if ("message" in error && typeof (error as {message: unknown}).message === "string") {
+            errorMessage += ` פרטי השגיאה: ${(error as {message: string}).message}`;
+        }
+        if ("stderr" in error && typeof (error as {stderr: unknown}).stderr === "string" && (error as {stderr: string}).stderr.trim() !== "") {
+            errorMessage += ` פלט שגיאה: ${(error as {stderr: string}).stderr.trim()}`;
+        }
+    }
+    throw new Error(errorMessage);
+  } finally {
+    try {
+      await fs.unlink(tempPdfFilePath);
+    } catch (cleanupError) {
+      console.error(`Failed to delete temporary PDF file ${tempPdfFilePath}:`, cleanupError);
+    }
   }
-  return fullText;
 }
 
 export async function POST(request: NextRequest) {
@@ -53,7 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     const files = [file1, file2];
-    
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       if (file.size > MAX_FILE_SIZE) {
@@ -68,35 +75,32 @@ export async function POST(request: NextRequest) {
 
       let extractedText;
       try {
-        extractedText = await extractTextFromPdf(buffer);
+        extractedText = await extractTextFromPdf(buffer, file.name);
       } catch (parseError: unknown) {
-        console.error(`Error parsing PDF ${file.name} with pdfjs-dist:`, parseError);
-        let errorMessage = `שגיאה בפענוח הקובץ ${file.name} באמצעות ספריית pdfjs-dist.`;
+        let errorMessage = `שגיאה בפענוח הקובץ ${file.name}.`;
         if (parseError instanceof Error) {
-            errorMessage += ` פרטי השגיאה: ${parseError.message}`;
+            errorMessage = parseError.message; // Use the more specific error from extractTextFromPdf
         }
         return NextResponse.json({ error: errorMessage }, { status: 500 });
       }
 
       const tempTextFileName = `extracted_${Date.now()}_${i}.txt`;
       const tempTextFilePath = path.join(UPLOAD_DIR, tempTextFileName);
-      await fs.writeFile(tempTextFilePath, extractedText); 
+      await fs.writeFile(tempTextFilePath, extractedText);
       tempTextFilePaths.push(tempTextFilePath);
     }
 
     tempJsonOutputPath = path.join(UPLOAD_DIR, `comparison_output_${Date.now()}.json`);
-    
+
     let pythonExecutable = "python3.11";
     try {
         await execFileAsync(pythonExecutable, ["--version"]);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (_e: unknown) { 
+    } catch (_e: unknown) {
         pythonExecutable = "python3";
         try {
             await execFileAsync(pythonExecutable, ["--version"]);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        } catch (_e2: unknown) { 
-            pythonExecutable = "python"; 
+        } catch (_e2: unknown) {
+            pythonExecutable = "python";
         }
     }
 
@@ -124,7 +128,7 @@ export async function POST(request: NextRequest) {
           if ("code" in err && typeof (err as {code: unknown}).code === "number") {
               specificCode = (err as {code: number}).code;
           }
-      } 
+      }
 
       if (specificStdErr) errorMessage += ` פרטי השגיאה: ${specificStdErr}`;
       if (specificStdOut) errorMessage += ` פלט: ${specificStdOut}`;
@@ -149,7 +153,7 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ error: "שגיאה פנימית בשרת בעת עיבוד הקבצים.", details: detailsMessage }, { status: 500 });
   } finally {
-    const filesToClean = [...tempTextFilePaths]; 
+    const filesToClean = [...tempTextFilePaths];
     if (tempJsonOutputPath) {
       filesToClean.push(tempJsonOutputPath);
     }

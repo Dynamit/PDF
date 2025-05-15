@@ -11,8 +11,7 @@
   "dependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "next": "15.3.2",
-    "pdfjs-dist": "^4.4.170"
+    "next": "15.3.2"
   },
   "devDependencies": {
     "typescript": "^5",
@@ -26,3 +25,4 @@
     "@eslint/eslintrc": "^3"
   }
 }
+

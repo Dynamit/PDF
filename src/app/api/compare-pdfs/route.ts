@@ -95,11 +95,13 @@ export async function POST(request: NextRequest) {
     let pythonExecutable = "python3.11";
     try {
         await execFileAsync(pythonExecutable, ["--version"]);
-    } catch (_e: unknown) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_e: unknown) { 
         pythonExecutable = "python3";
         try {
             await execFileAsync(pythonExecutable, ["--version"]);
-        } catch (_e2: unknown) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (_e2: unknown) { 
             pythonExecutable = "python";
         }
     }
@@ -166,4 +168,3 @@ export async function POST(request: NextRequest) {
     }
   }
 }
-

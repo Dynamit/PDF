@@ -6,16 +6,9 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import * as pdfjsLib from "pdfjs-dist"; 
 
-// Define a more specific type for text items from pdfjs-dist
-interface TextItem {
-  str: string;
-  dir: string;
-  width: number;
-  height: number;
-  transform: number[];
-  fontName: string;
-  hasEOL: boolean;
-}
+// pdfjs-dist types for TextContent items
+// We expect items to be of type pdfjsLib.TextItem if they contain text.
+// pdfjsLib.TextItem is an interface that includes the 'str' property.
 
 // Set the worker source to a CDN version to avoid bundling issues
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -31,7 +24,13 @@ async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   for (let i = 1; i <= pdfDoc.numPages; i++) {
     const page = await pdfDoc.getPage(i);
     const textContent = await page.getTextContent();
-    const pageText = textContent.items.map((item: TextItem) => item.str).join(" "); // Use TextItem type
+    // Process items, checking if they are TextItems (which have the 'str' property)
+    const pageText = textContent.items.map(item => {
+      if ('str' in item) { // Type guard to check if item is a TextItem
+        return (item as pdfjsLib.TextItem).str;
+      }
+      return ''; // Ignore other item types like TextMarkedContent
+    }).filter(str => str !== '').join(" "); // Filter out empty strings before joining
     fullText += pageText + "\n"; 
   }
   return fullText;

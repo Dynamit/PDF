@@ -4,7 +4,9 @@ import fs from "fs/promises";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-// Import pdf-parse with require instead of ES import
+
+// Disable ESLint for this line to allow require() style import
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require('pdf-parse');
 
 const execFileAsync = promisify(execFile);

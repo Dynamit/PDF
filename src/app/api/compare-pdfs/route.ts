@@ -8,7 +8,7 @@ import { promisify } from "util";
 import * as pdfjsLib from "pdfjs-dist";
 
 // Set workerSrc to null to disable worker loading globally
-// @ts-ignore - The types might not perfectly align, but null is a valid way to disable worker
+// @ts-expect-error - The types might not perfectly align, but null is a valid way to disable worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = null;
 
 const execFileAsync = promisify(execFile);

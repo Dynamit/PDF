@@ -4,10 +4,8 @@ import fs from "fs/promises";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-
-// Disable ESLint for this line to allow require() style import
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require('pdf-parse');
+const PDFExtract = require('pdf.js-extract').PDFExtract;
 
 const execFileAsync = promisify(execFile);
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
@@ -16,15 +14,35 @@ const PYTHON_SCRIPT_PATH = path.resolve(process.cwd(), "scripts/compare_texts.py
 
 async function extractTextFromPdf(pdfBuffer: Buffer): Promise<string> {
   try {
-    // Pass the buffer directly to pdf-parse with explicit options
-    const data = await pdfParse(pdfBuffer, {
-      // Explicitly set options to avoid using test files
-      max: 0 // No page limitation
-    });
-    return data.text;
+    const pdfExtract = new PDFExtract();
+    const options = {}; // default options
+
+    // Use the extract method with buffer data
+    const data = await pdfExtract.extractBuffer(pdfBuffer, options);
+    
+    // Process the extracted data to get text content
+    let fullText = '';
+    
+    if (data && data.pages) {
+      for (let i = 0; i < data.pages.length; i++) {
+        const page = data.pages[i];
+        fullText += `--- Page ${i + 1} ---\n`;
+        
+        // Extract text content from the page
+        if (page.content) {
+          const pageText = page.content
+            .map((item: { str: string }) => item.str)
+            .join(' ');
+          
+          fullText += pageText + '\n\n';
+        }
+      }
+    }
+    
+    return fullText;
   } catch (error: unknown) {
-    console.error(`Error extracting text with pdf-parse:`, error);
-    let errorMessage = `שגיאה בחילוץ טקסט מהקובץ באמצעות pdf-parse.`;
+    console.error(`Error extracting text with pdf.js-extract:`, error);
+    let errorMessage = `שגיאה בחילוץ טקסט מהקובץ באמצעות pdf.js-extract.`;
     if (error instanceof Error) {
       errorMessage += ` פרטי השגיאה: ${error.message}`;
     }

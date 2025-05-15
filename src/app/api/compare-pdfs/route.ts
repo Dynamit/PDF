@@ -4,15 +4,30 @@ import fs from "fs/promises";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import pdf from "pdf-parse"; // Import pdf-parse
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js"; // Using legacy build for broader compatibility
+
+// Required for pdfjs-dist to work in Node.js
+// @ts-ignore
+pdfjsLib.GlobalWorkerOptions.workerSrc = await import("pdfjs-dist/legacy/build/pdf.worker.js");
 
 const execFileAsync = promisify(execFile);
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
 const UPLOAD_DIR = "/tmp"; // Use a temporary directory
 const PYTHON_SCRIPT_PATH = path.resolve(process.cwd(), "scripts/compare_texts.py");
 
+async function extractTextFromPdf(buffer: Buffer): Promise<string> {
+  const pdfDoc = await pdfjsLib.getDocument({ data: buffer }).promise;
+  let fullText = "";
+  for (let i = 1; i <= pdfDoc.numPages; i++) {
+    const page = await pdfDoc.getPage(i);
+    const textContent = await page.getTextContent();
+    const pageText = textContent.items.map((item: any) => item.str).join(" ");
+    fullText += pageText + "\n"; // Add newline between pages
+  }
+  return fullText;
+}
+
 export async function POST(request: NextRequest) {
-  // Removed tempFilePaths as we will process buffers directly for pdf-parse
   const tempTextFilePaths: string[] = [];
   let tempJsonOutputPath: string | null = null;
 
@@ -41,14 +56,12 @@ export async function POST(request: NextRequest) {
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
 
-      // Use pdf-parse to extract text
       let extractedText;
       try {
-        const data = await pdf(buffer);
-        extractedText = data.text;
+        extractedText = await extractTextFromPdf(buffer);
       } catch (parseError: unknown) {
-        console.error(`Error parsing PDF ${file.name} with pdf-parse:`, parseError);
-        let errorMessage = `שגיאה בפענוח הקובץ ${file.name} באמצעות ספריית pdf-parse.`;
+        console.error(`Error parsing PDF ${file.name} with pdfjs-dist:`, parseError);
+        let errorMessage = `שגיאה בפענוח הקובץ ${file.name} באמצעות ספריית pdfjs-dist.`;
         if (parseError instanceof Error) {
             errorMessage += ` פרטי השגיאה: ${parseError.message}`;
         }
@@ -57,7 +70,7 @@ export async function POST(request: NextRequest) {
 
       const tempTextFileName = `extracted_${Date.now()}_${i}.txt`;
       const tempTextFilePath = path.join(UPLOAD_DIR, tempTextFileName);
-      await fs.writeFile(tempTextFilePath, extractedText); // Save extracted text to file
+      await fs.writeFile(tempTextFilePath, extractedText); 
       tempTextFilePaths.push(tempTextFilePath);
     }
 
@@ -66,12 +79,10 @@ export async function POST(request: NextRequest) {
     let pythonExecutable = "python3.11";
     try {
         await execFileAsync(pythonExecutable, ["--version"]);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (_e: unknown) { 
         pythonExecutable = "python3";
         try {
             await execFileAsync(pythonExecutable, ["--version"]);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (_e2: unknown) { 
             pythonExecutable = "python"; 
         }
@@ -126,7 +137,6 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ error: "שגיאה פנימית בשרת בעת עיבוד הקבצים.", details: detailsMessage }, { status: 500 });
   } finally {
-    // No need to clean tempFilePaths as they are not created anymore
     const filesToClean = [...tempTextFilePaths]; 
     if (tempJsonOutputPath) {
       filesToClean.push(tempJsonOutputPath);

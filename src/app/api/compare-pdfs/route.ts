@@ -4,11 +4,12 @@ import fs from "fs/promises";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js"; // Using legacy build for broader compatibility
+import * as pdfjsLib from "pdfjs-dist"; // Use the main import
 
-// Required for pdfjs-dist to work in Node.js
-// @ts-ignore
-pdfjsLib.GlobalWorkerOptions.workerSrc = await import("pdfjs-dist/legacy/build/pdf.worker.js");
+// Set the worker source to a CDN version to avoid bundling issues
+// Make sure the version in the URL matches the installed pdfjs-dist version
+// We can use pdfjsLib.version to get the installed version dynamically
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 const execFileAsync = promisify(execFile);
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
@@ -21,6 +22,7 @@ async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   for (let i = 1; i <= pdfDoc.numPages; i++) {
     const page = await pdfDoc.getPage(i);
     const textContent = await page.getTextContent();
+    // Ensure item.str is accessed correctly, it might be nested or need type assertion
     const pageText = textContent.items.map((item: any) => item.str).join(" ");
     fullText += pageText + "\n"; // Add newline between pages
   }

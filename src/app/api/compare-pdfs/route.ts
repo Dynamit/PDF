@@ -4,10 +4,15 @@ import fs from "fs/promises";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import * as pdfjsLib from "pdfjs-dist"; 
+// Use the legacy build for Node.js environments as recommended
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
 
-// Set the worker source to a CDN version to avoid bundling issues
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// For server-side execution, especially with the legacy build, 
+// we might not need to set workerSrc, or set it to null/disable it.
+// The legacy build is often more self-contained for Node.js.
+// If issues persist, this might need to be pdfjsLib.GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
+// But let's try without it first, as the error was about HTTP protocol for worker.
+pdfjsLib.GlobalWorkerOptions.isWorkerDisabled = true;
 
 const execFileAsync = promisify(execFile);
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
@@ -16,18 +21,22 @@ const PYTHON_SCRIPT_PATH = path.resolve(process.cwd(), "scripts/compare_texts.py
 
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   const uint8Array = new Uint8Array(buffer); // Convert Buffer to Uint8Array
-  const pdfDoc = await pdfjsLib.getDocument({ data: uint8Array }).promise; // Use Uint8Array
+  const pdfDoc = await pdfjsLib.getDocument({ 
+    data: uint8Array,
+    // Disable worker for server-side processing if it causes issues
+    // useWorkerFetch: false, // This option might be relevant for older versions or specific setups
+    // worker: null, // Another way to potentially disable worker
+  }).promise; 
   let fullText = "";
   for (let i = 1; i <= pdfDoc.numPages; i++) {
     const page = await pdfDoc.getPage(i);
     const textContent = await page.getTextContent();
-    // Process items, checking if they have the 'str' property
     const pageText = textContent.items.map(item => {
       if (typeof item === "object" && item !== null && "str" in item && typeof item.str === "string") {
         return item.str;
       }
-      return ""; // Ignore other item types or items without a string 'str' property
-    }).filter(str => str !== "").join(" "); // Filter out empty strings before joining
+      return ""; 
+    }).filter(str => str !== "").join(" "); 
     fullText += pageText + "\n"; 
   }
   return fullText;

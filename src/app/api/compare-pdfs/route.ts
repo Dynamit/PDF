@@ -7,8 +7,8 @@ import { promisify } from "util";
 // Use the standard import for pdfjs-dist
 import * as pdfjsLib from "pdfjs-dist";
 
-// Disable the worker for server-side Node.js environments like Vercel
-pdfjsLib.GlobalWorkerOptions.isWorkerDisabled = true;
+// Removed: pdfjsLib.GlobalWorkerOptions.isWorkerDisabled = true;
+// Worker will be disabled in getDocument call directly
 
 const execFileAsync = promisify(execFile);
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
@@ -19,6 +19,7 @@ async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   const uint8Array = new Uint8Array(buffer); // Convert Buffer to Uint8Array
   const pdfDoc = await pdfjsLib.getDocument({ 
     data: uint8Array,
+    worker: null // Disable worker for server-side Node.js environment
   }).promise; 
   let fullText = "";
   for (let i = 1; i <= pdfDoc.numPages; i++) {

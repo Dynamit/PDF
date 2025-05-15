@@ -4,16 +4,25 @@ import fs from "fs/promises";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import * as pdfjsLib from "pdfjs-dist"; // Use the main import
+import * as pdfjsLib from "pdfjs-dist"; 
+
+// Define a more specific type for text items from pdfjs-dist
+interface TextItem {
+  str: string;
+  dir: string;
+  width: number;
+  height: number;
+  transform: number[];
+  fontName: string;
+  hasEOL: boolean;
+}
 
 // Set the worker source to a CDN version to avoid bundling issues
-// Make sure the version in the URL matches the installed pdfjs-dist version
-// We can use pdfjsLib.version to get the installed version dynamically
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 const execFileAsync = promisify(execFile);
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
-const UPLOAD_DIR = "/tmp"; // Use a temporary directory
+const UPLOAD_DIR = "/tmp"; 
 const PYTHON_SCRIPT_PATH = path.resolve(process.cwd(), "scripts/compare_texts.py");
 
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
@@ -22,9 +31,8 @@ async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   for (let i = 1; i <= pdfDoc.numPages; i++) {
     const page = await pdfDoc.getPage(i);
     const textContent = await page.getTextContent();
-    // Ensure item.str is accessed correctly, it might be nested or need type assertion
-    const pageText = textContent.items.map((item: any) => item.str).join(" ");
-    fullText += pageText + "\n"; // Add newline between pages
+    const pageText = textContent.items.map((item: TextItem) => item.str).join(" "); // Use TextItem type
+    fullText += pageText + "\n"; 
   }
   return fullText;
 }
@@ -81,10 +89,12 @@ export async function POST(request: NextRequest) {
     let pythonExecutable = "python3.11";
     try {
         await execFileAsync(pythonExecutable, ["--version"]);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (_e: unknown) { 
         pythonExecutable = "python3";
         try {
             await execFileAsync(pythonExecutable, ["--version"]);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (_e2: unknown) { 
             pythonExecutable = "python"; 
         }

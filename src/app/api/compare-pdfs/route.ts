@@ -7,7 +7,9 @@ import { promisify } from "util";
 // Use the standard import for pdfjs-dist
 import * as pdfjsLib from "pdfjs-dist";
 
-// No global worker options set here, will use disableWorker in getDocument
+// Set workerSrc to null to disable worker loading globally
+// @ts-ignore - The types might not perfectly align, but null is a valid way to disable worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = null;
 
 const execFileAsync = promisify(execFile);
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
@@ -18,7 +20,7 @@ async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   const uint8Array = new Uint8Array(buffer); // Convert Buffer to Uint8Array
   const pdfDoc = await pdfjsLib.getDocument({ 
     data: uint8Array,
-    disableWorker: true // Explicitly disable worker for server-side Node.js environment
+    // Removed disableWorker: true, relying on global workerSrc = null
   }).promise; 
   let fullText = "";
   for (let i = 1; i <= pdfDoc.numPages; i++) {
@@ -160,3 +162,4 @@ export async function POST(request: NextRequest) {
     }
   }
 }
+

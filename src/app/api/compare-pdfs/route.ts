@@ -7,8 +7,8 @@ import { promisify } from "util";
 // Use the standard import for pdfjs-dist
 import * as pdfjsLib from "pdfjs-dist";
 
-// Removed: pdfjsLib.GlobalWorkerOptions.isWorkerDisabled = true;
-// Worker will be disabled in getDocument call directly
+// Worker is not explicitly set here; 
+// it will be omitted in getDocument call for server-side Node.js environment
 
 const execFileAsync = promisify(execFile);
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
@@ -17,9 +17,9 @@ const PYTHON_SCRIPT_PATH = path.resolve(process.cwd(), "scripts/compare_texts.py
 
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   const uint8Array = new Uint8Array(buffer); // Convert Buffer to Uint8Array
+  // Omit the worker property; pdfjs-dist should handle this in Node.js
   const pdfDoc = await pdfjsLib.getDocument({ 
     data: uint8Array,
-    worker: null // Disable worker for server-side Node.js environment
   }).promise; 
   let fullText = "";
   for (let i = 1; i <= pdfDoc.numPages; i++) {

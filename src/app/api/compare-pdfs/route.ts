@@ -4,43 +4,25 @@ import fs from "fs/promises";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
+import pdfParse from 'pdf-parse';
 
 const execFileAsync = promisify(execFile);
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
 const UPLOAD_DIR = "/tmp";
 const PYTHON_SCRIPT_PATH = path.resolve(process.cwd(), "scripts/compare_texts.py");
 
-async function extractTextFromPdf(pdfBuffer: Buffer, originalFileName: string): Promise<string> {
-  const tempPdfFileName = `temp_${Date.now()}_${originalFileName}`;
-  const tempPdfFilePath = path.join(UPLOAD_DIR, tempPdfFileName);
-
+async function extractTextFromPdf(pdfBuffer: Buffer): Promise<string> {
   try {
-    await fs.writeFile(tempPdfFilePath, pdfBuffer);
-    // Execute pdftotext: pdftotext <pdf_file_path> -
-    // The trailing hyphen means output to stdout
-    const { stdout, stderr } = await execFileAsync("pdftotext", [tempPdfFilePath, "-"]);
-    if (stderr) {
-      console.warn(`pdftotext stderr for ${originalFileName}: ${stderr}`);
-    }
-    return stdout;
+    // Use pdf-parse to extract text from the PDF buffer
+    const data = await pdfParse(pdfBuffer);
+    return data.text;
   } catch (error: unknown) {
-    console.error(`Error extracting text with pdftotext for ${originalFileName}:`, error);
-    let errorMessage = `שגיאה בחילוץ טקסט מהקובץ ${originalFileName} באמצעות pdftotext.`;
-    if (typeof error === "object" && error !== null) {
-        if ("message" in error && typeof (error as {message: unknown}).message === "string") {
-            errorMessage += ` פרטי השגיאה: ${(error as {message: string}).message}`;
-        }
-        if ("stderr" in error && typeof (error as {stderr: unknown}).stderr === "string" && (error as {stderr: string}).stderr.trim() !== "") {
-            errorMessage += ` פלט שגיאה: ${(error as {stderr: string}).stderr.trim()}`;
-        }
+    console.error(`Error extracting text with pdf-parse:`, error);
+    let errorMessage = `שגיאה בחילוץ טקסט מהקובץ באמצעות pdf-parse.`;
+    if (error instanceof Error) {
+      errorMessage += ` פרטי השגיאה: ${error.message}`;
     }
     throw new Error(errorMessage);
-  } finally {
-    try {
-      await fs.unlink(tempPdfFilePath);
-    } catch (cleanupError) {
-      console.error(`Failed to delete temporary PDF file ${tempPdfFilePath}:`, cleanupError);
-    }
   }
 }
 
@@ -75,7 +57,7 @@ export async function POST(request: NextRequest) {
 
       let extractedText;
       try {
-        extractedText = await extractTextFromPdf(buffer, file.name);
+        extractedText = await extractTextFromPdf(buffer);
       } catch (parseError: unknown) {
         let errorMessage = `שגיאה בפענוח הקובץ ${file.name}.`;
         if (parseError instanceof Error) {

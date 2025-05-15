@@ -4,23 +4,10 @@ import fs from "fs/promises";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
+// Use the standard import for pdfjs-dist
+import * as pdfjsLib from "pdfjs-dist";
 
-// Attempt to use the legacy build for Node.js environments
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
-
-// Set the worker source to the legacy worker file
-// Note: require.resolve might not work as expected in all Vercel build environments for Next.js API routes.
-// If this causes a build error, we might need to remove this line and rely on pdfjs-dist
-// to correctly handle its worker in a Node.js legacy environment, or find an alternative way to specify the worker.
-try {
-    // @ts-ignore - pdfjsLib types might not perfectly match the legacy import structure for GlobalWorkerOptions
-    pdfjsLib.GlobalWorkerOptions.workerSrc = require.resolve("pdfjs-dist/legacy/build/pdf.worker.js");
-} catch (e) {
-    console.warn("Could not resolve legacy pdf.worker.js path, pdfjs-dist might try to use a default or fail if worker is needed.");
-    // Fallback or alternative: if worker is strictly needed and above fails, 
-    // we might need to disable it if the legacy build can operate without it for simple text extraction.
-    // For now, let's assume the legacy build might handle it or the above resolve works.
-}
+// No global worker options set here, will use disableWorker in getDocument
 
 const execFileAsync = promisify(execFile);
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
@@ -28,21 +15,20 @@ const UPLOAD_DIR = "/tmp";
 const PYTHON_SCRIPT_PATH = path.resolve(process.cwd(), "scripts/compare_texts.py");
 
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
-  const uint8Array = new Uint8Array(buffer);
+  const uint8Array = new Uint8Array(buffer); // Convert Buffer to Uint8Array
   const pdfDoc = await pdfjsLib.getDocument({ 
     data: uint8Array,
-    // The legacy build might not need worker explicitly disabled here if workerSrc is set globally
+    disableWorker: true // Explicitly disable worker for server-side Node.js environment
   }).promise; 
   let fullText = "";
   for (let i = 1; i <= pdfDoc.numPages; i++) {
     const page = await pdfDoc.getPage(i);
     const textContent = await page.getTextContent();
     const pageText = textContent.items.map(item => {
-        // Ensure item is an object and has the 'str' property
-        if (typeof item === "object" && item !== null && "str" in item && typeof (item as any).str === 'string') {
-            return (item as any).str;
-        }
-        return ""; 
+      if (typeof item === "object" && item !== null && "str" in item && typeof item.str === "string") {
+        return item.str;
+      }
+      return ""; 
     }).filter(str => str !== "").join(" "); 
     fullText += pageText + "\n"; 
   }
@@ -101,10 +87,12 @@ export async function POST(request: NextRequest) {
     let pythonExecutable = "python3.11";
     try {
         await execFileAsync(pythonExecutable, ["--version"]);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (_e: unknown) { 
         pythonExecutable = "python3";
         try {
             await execFileAsync(pythonExecutable, ["--version"]);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (_e2: unknown) { 
             pythonExecutable = "python"; 
         }

@@ -4,7 +4,8 @@ import fs from "fs/promises";
 import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import pdfParse from 'pdf-parse';
+// Import pdf-parse with require instead of ES import
+const pdfParse = require('pdf-parse');
 
 const execFileAsync = promisify(execFile);
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
@@ -13,8 +14,11 @@ const PYTHON_SCRIPT_PATH = path.resolve(process.cwd(), "scripts/compare_texts.py
 
 async function extractTextFromPdf(pdfBuffer: Buffer): Promise<string> {
   try {
-    // Use pdf-parse to extract text from the PDF buffer
-    const data = await pdfParse(pdfBuffer);
+    // Pass the buffer directly to pdf-parse with explicit options
+    const data = await pdfParse(pdfBuffer, {
+      // Explicitly set options to avoid using test files
+      max: 0 // No page limitation
+    });
     return data.text;
   } catch (error: unknown) {
     console.error(`Error extracting text with pdf-parse:`, error);

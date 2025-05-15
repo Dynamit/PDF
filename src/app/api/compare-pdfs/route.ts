@@ -15,7 +15,8 @@ const UPLOAD_DIR = "/tmp";
 const PYTHON_SCRIPT_PATH = path.resolve(process.cwd(), "scripts/compare_texts.py");
 
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
-  const pdfDoc = await pdfjsLib.getDocument({ data: buffer }).promise;
+  const uint8Array = new Uint8Array(buffer); // Convert Buffer to Uint8Array
+  const pdfDoc = await pdfjsLib.getDocument({ data: uint8Array }).promise; // Use Uint8Array
   let fullText = "";
   for (let i = 1; i <= pdfDoc.numPages; i++) {
     const page = await pdfDoc.getPage(i);

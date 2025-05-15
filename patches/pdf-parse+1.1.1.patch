@@ -1,5 +1,5 @@
---- a/index.js
-+++ b/index.js
+--- a/node_modules/pdf-parse/index.js
++++ b/node_modules/pdf-parse/index.js
 @@ -2,25 +2,3 @@
  const Fs = require('fs');
  const Pdf = require('./lib/pdf-parse.js');

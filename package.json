@@ -24,6 +24,8 @@
     "eslint": "^9",
     "eslint-config-next": "15.3.2",
     "@eslint/eslintrc": "^3",
-     "@types/pdf-parse": "^1.1.0"
+    "@types/pdf-parse": "^1.1.0",
+    "patch-package": "^8.0.0",
+    "postinstall-postinstall": "^2.1.0"
   }
 }
